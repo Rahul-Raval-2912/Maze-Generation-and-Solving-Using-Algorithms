@@ -53,18 +53,20 @@ class MazeApp:
         top.pack(pady=5)
 
         self.gen_var = tk.StringVar(value="Recursive Backtracking")
-        ttk.Combobox(
+        self.gen_combo = ttk.Combobox(
             top, textvariable=self.gen_var, width=22,
             values=["Recursive Backtracking", "Prim", "Wilson"]
-        ).grid(row=0, column=0, padx=5)
+        )
+        self.gen_combo.grid(row=0, column=0, padx=5)
 
         tk.Button(top, text="Generate", command=self.generate).grid(row=0, column=1, padx=5)
 
         self.solve_var = tk.StringVar(value="Dijkstra")
-        ttk.Combobox(
+        self.solve_combo = ttk.Combobox(
             top, textvariable=self.solve_var, width=22,
             values=["Wall Follower", "Dijkstra", "A*"]
-        ).grid(row=0, column=2, padx=5)
+        )
+        self.solve_combo.grid(row=0, column=2, padx=5)
 
         tk.Button(top, text="Solve", command=self.solve).grid(row=0, column=3, padx=5)
 
@@ -146,10 +148,10 @@ class MazeApp:
     def animate(self):
         try:
             if self.speed.get() >= 190:
-                while True:
+                for _ in range(100):
                     self.current = next(self.generator)
             else:
-                for _ in range(self.speed.get() // 20):
+                for _ in range(max(1, self.speed.get() // 20)):
                     self.current = next(self.generator)
 
             self.draw()
@@ -159,6 +161,10 @@ class MazeApp:
             self.animating = False
             self.current = None
             self.draw()
+            if self.solved:
+                self.blink("Path Found")
+            else:
+                self.blink("Maze Generated")
 
 
     # generation
@@ -177,7 +183,6 @@ class MazeApp:
 
         self.animating = True
         self.animate()
-        self.blink("Maze Generated")
 
     def dfs_gen(self):
         stack = [self.start]
@@ -206,8 +211,8 @@ class MazeApp:
         for dr,dc in [(0,2),(2,0),(0,-2),(-2,0)]:
             walls.append((r,c,r+dr,c+dc))
         while walls:
-            r,c,nr,nc = random.choice(walls)
-            walls.remove((r,c,nr,nc))
+            idx = random.randrange(len(walls))
+            r,c,nr,nc = walls.pop(idx)
             if 1 <= nr < ROWS-1 and 1 <= nc < COLS-1 and (nr,nc) not in self.visited:
                 self.visited.add((nr,nc))
                 self.maze[(r+nr)//2][(c+nc)//2] = 0
@@ -218,16 +223,18 @@ class MazeApp:
     def wilson_gen(self):
         cells = [(r,c) for r in range(1,ROWS,2) for c in range(1,COLS,2)]
         visited = {random.choice(cells)}
+        unvisited = set(cells) - visited
 
-        while len(visited) < len(cells):
-            start = random.choice([c for c in cells if c not in visited])
+        while unvisited:
+            start = random.choice(list(unvisited))
             path = {start: None}
             cur = start
 
             while cur not in visited:
                 r,c = cur
-                nxt = random.choice([(r+dr,c+dc) for dr,dc in [(0,2),(2,0),(0,-2),(-2,0)]
-                                     if 1 <= r+dr < ROWS-1 and 1 <= c+dc < COLS-1])
+                neighbors = [(r+dr,c+dc) for dr,dc in [(0,2),(2,0),(0,-2),(-2,0)]
+                             if 1 <= r+dr < ROWS-1 and 1 <= c+dc < COLS-1]
+                nxt = random.choice(neighbors)
                 path[nxt] = cur
                 cur = nxt
 
@@ -236,6 +243,7 @@ class MazeApp:
                 if prev:
                     self.maze[(cur[0]+prev[0])//2][(cur[1]+prev[1])//2] = 0
                 visited.add(cur)
+                unvisited.discard(cur)
                 yield cur
                 cur = prev
 
@@ -257,7 +265,6 @@ class MazeApp:
 
         self.animating = True
         self.animate()
-        self.blink("Path Found")
 
     def neighbors(self, r, c):
         for dr,dc in [(0,1),(1,0),(0,-1),(-1,0)]:
@@ -268,12 +275,26 @@ class MazeApp:
     def wall_follower_gen(self):
         cur = self.start
         path = [cur]
-        while cur != self.end:
+        visited_set = {cur}
+        max_iterations = ROWS * COLS
+        iterations = 0
+        
+        while cur != self.end and iterations < max_iterations:
             yield cur
+            iterations += 1
+            found = False
             for n in self.neighbors(*cur):
-                if n not in path:
+                if n not in visited_set:
                     cur = n
                     path.append(cur)
+                    visited_set.add(cur)
+                    found = True
+                    break
+            if not found:
+                if len(path) > 1:
+                    path.pop()
+                    cur = path[-1]
+                else:
                     break
         self.path = path
         self.solved = True
@@ -329,13 +350,6 @@ class MazeApp:
                         (tg + h(n, self.end), tg, n)
                     )
 
-            self.path.clear()
-            p = cur
-            while p in came:
-                self.path.append(p)
-                p = came[p]
-
-        self.path.clear()
         cur = self.end
         while cur in came:
             self.path.append(cur)
