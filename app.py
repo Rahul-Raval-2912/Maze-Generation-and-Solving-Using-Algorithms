@@ -222,40 +222,37 @@ class MazeApp:
 
     def wilson_gen(self):
         cells = [(r,c) for r in range(1,ROWS,2) for c in range(1,COLS,2)]
-        cell_set = set(cells)
-        visited = {random.choice(cells)}
-        unvisited = cell_set - visited
-
-        while unvisited:
-            start = random.choice(list(unvisited))
-            path = {start: None}
-            cur = start
-            max_walk = len(cells) * 2
-            walk_steps = 0
-
-            while cur not in visited and walk_steps < max_walk:
-                r,c = cur
-                neighbors = [(r+dr,c+dc) for dr,dc in [(0,2),(2,0),(0,-2),(-2,0)]
-                             if (r+dr,c+dc) in cell_set]
-                if not neighbors:
-                    break
-                nxt = random.choice(neighbors)
-                path[nxt] = cur
-                cur = nxt
-                walk_steps += 1
-
-            if cur not in visited:
-                unvisited.discard(start)
+        in_maze = set()
+        in_maze.add(random.choice(cells))
+        
+        for cell in cells:
+            if cell in in_maze:
                 continue
-
-            while cur in path:
-                prev = path[cur]
-                if prev:
-                    self.maze[(cur[0]+prev[0])//2][(cur[1]+prev[1])//2] = 0
-                visited.add(cur)
-                unvisited.discard(cur)
-                yield cur
-                cur = prev
+                
+            walk = [cell]
+            cur = cell
+            
+            while cur not in in_maze:
+                r, c = cur
+                neighbors = [(r+dr,c+dc) for dr,dc in [(0,2),(2,0),(0,-2),(-2,0)]
+                             if 1 <= r+dr < ROWS and 1 <= c+dc < COLS]
+                nxt = random.choice(neighbors)
+                
+                try:
+                    idx = walk.index(nxt)
+                    walk = walk[:idx+1]
+                except ValueError:
+                    walk.append(nxt)
+                
+                cur = nxt
+            
+            for i in range(len(walk)):
+                in_maze.add(walk[i])
+                if i > 0:
+                    r1, c1 = walk[i-1]
+                    r2, c2 = walk[i]
+                    self.maze[(r1+r2)//2][(c1+c2)//2] = 0
+                yield walk[i]
 
     # solving
     def solve(self):
