@@ -222,21 +222,31 @@ class MazeApp:
 
     def wilson_gen(self):
         cells = [(r,c) for r in range(1,ROWS,2) for c in range(1,COLS,2)]
+        cell_set = set(cells)
         visited = {random.choice(cells)}
-        unvisited = set(cells) - visited
+        unvisited = cell_set - visited
 
         while unvisited:
             start = random.choice(list(unvisited))
             path = {start: None}
             cur = start
+            max_walk = len(cells) * 2
+            walk_steps = 0
 
-            while cur not in visited:
+            while cur not in visited and walk_steps < max_walk:
                 r,c = cur
                 neighbors = [(r+dr,c+dc) for dr,dc in [(0,2),(2,0),(0,-2),(-2,0)]
-                             if 1 <= r+dr < ROWS-1 and 1 <= c+dc < COLS-1]
+                             if (r+dr,c+dc) in cell_set]
+                if not neighbors:
+                    break
                 nxt = random.choice(neighbors)
                 path[nxt] = cur
                 cur = nxt
+                walk_steps += 1
+
+            if cur not in visited:
+                unvisited.discard(start)
+                continue
 
             while cur in path:
                 prev = path[cur]
